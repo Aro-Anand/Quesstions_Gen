@@ -1,0 +1,9 @@
+# requirements.txt
+langchain-openai
+pinecone
+langchain-core
+python-dotenv
+streamlit
+langgraph
+langchain
+openai
