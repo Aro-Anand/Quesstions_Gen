@@ -7,3 +7,16 @@ streamlit
 langgraph
 langchain
 openai
+
+# PDF processing
+pdfplumber
+PyPDF2
+pypdf
+
+# Document processing
+unstructured
+tiktoken
+
+# Utilities
+pandas
+numpy

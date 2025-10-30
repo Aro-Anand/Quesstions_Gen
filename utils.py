@@ -1,13 +1,15 @@
 # utils.py
 """
-Utility functions for Pinecone setup, embeddings, and dummy data management.
+Enhanced utility functions with PDF processing capabilities.
 """
 import os
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from pinecone import Pinecone, ServerlessSpec
 from openai import OpenAI
 from dotenv import load_dotenv
+from document_processor import process_and_embed_pdf
 
 # Load environment variables
 load_dotenv()
@@ -61,7 +63,7 @@ def initialize_pinecone() -> Pinecone:
 
 def setup_syllabus_index(pc: Pinecone, index_name: str = "syllabus-vectors") -> Any:
     """
-    Create or connect to Pinecone index and populate with dummy syllabus data.
+    Create or connect to Pinecone index for syllabus documents.
     
     Args:
         pc: Pinecone client instance
@@ -93,129 +95,86 @@ def setup_syllabus_index(pc: Pinecone, index_name: str = "syllabus-vectors") -> 
         raise
 
 
-def get_dummy_syllabus_data() -> List[Dict[str, Any]]:
+def upload_pdf_to_vectorstore(
+    index: Any,
+    pdf_path: str,
+    class_level: str,
+    subject: str,
+    chapter: str,
+    progress_callback: Optional[callable] = None
+) -> Dict[str, Any]:
     """
-    Generate dummy syllabus content for pre-population.
-    
-    Returns:
-        List of syllabus content dictionaries
-    """
-    return [
-        {
-            "id": "math10_algebra_quadratic_1",
-            "text": "Quadratic equations involve solving equations of the form ax² + bx + c = 0. Methods include factoring, completing the square, and using the quadratic formula.",
-            "metadata": {"class": "Class 10", "subject": "Math", "chapter": "Algebra", "topic": "Quadratic Equations"}
-        },
-        {
-            "id": "math10_algebra_quadratic_2",
-            "text": "The discriminant (b² - 4ac) determines the nature of roots. Positive discriminant gives two real roots, zero gives one repeated root, negative gives complex roots.",
-            "metadata": {"class": "Class 10", "subject": "Math", "chapter": "Algebra", "topic": "Quadratic Equations"}
-        },
-        {
-            "id": "math10_geometry_triangles_1",
-            "text": "Similar triangles have equal corresponding angles and proportional sides. The Pythagorean theorem applies to right triangles: a² + b² = c².",
-            "metadata": {"class": "Class 10", "subject": "Math", "chapter": "Geometry", "topic": "Triangles"}
-        },
-        {
-            "id": "math10_geometry_circles_1",
-            "text": "Circle properties include radius, diameter, chord, tangent, and secant. The area is πr² and circumference is 2πr.",
-            "metadata": {"class": "Class 10", "subject": "Math", "chapter": "Geometry", "topic": "Circles"}
-        },
-        {
-            "id": "math12_calculus_derivatives_1",
-            "text": "Derivatives represent the rate of change. Basic rules include power rule: d/dx(x^n) = nx^(n-1), product rule, and chain rule.",
-            "metadata": {"class": "Class 12", "subject": "Math", "chapter": "Calculus", "topic": "Derivatives"}
-        },
-        {
-            "id": "math12_calculus_integrals_1",
-            "text": "Integration is the reverse of differentiation. Definite integrals calculate area under curves. Fundamental theorem connects derivatives and integrals.",
-            "metadata": {"class": "Class 12", "subject": "Math", "chapter": "Calculus", "topic": "Integration"}
-        },
-        {
-            "id": "science10_physics_motion_1",
-            "text": "Newton's laws of motion: First law (inertia), Second law (F=ma), Third law (action-reaction). These govern motion and forces.",
-            "metadata": {"class": "Class 10", "subject": "Science", "chapter": "Physics", "topic": "Motion and Force"}
-        },
-        {
-            "id": "science10_chemistry_acids_1",
-            "text": "Acids are proton donors with pH < 7. Bases are proton acceptors with pH > 7. Neutralization reaction: acid + base → salt + water.",
-            "metadata": {"class": "Class 10", "subject": "Science", "chapter": "Chemistry", "topic": "Acids and Bases"}
-        },
-        {
-            "id": "science10_biology_cells_1",
-            "text": "Cells are the basic unit of life. Prokaryotic cells lack a nucleus, eukaryotic cells have membrane-bound organelles including nucleus, mitochondria, and chloroplasts.",
-            "metadata": {"class": "Class 10", "subject": "Science", "chapter": "Biology", "topic": "Cell Structure"}
-        },
-        {
-            "id": "math10_algebra_polynomials_1",
-            "text": "Polynomials are algebraic expressions with terms containing variables raised to whole number powers. Operations include addition, subtraction, multiplication, and division.",
-            "metadata": {"class": "Class 10", "subject": "Math", "chapter": "Algebra", "topic": "Polynomials"}
-        },
-        {
-            "id": "math10_trigonometry_ratios_1",
-            "text": "Trigonometric ratios in right triangles: sin(θ) = opposite/hypotenuse, cos(θ) = adjacent/hypotenuse, tan(θ) = opposite/adjacent. These relate angles to side lengths.",
-            "metadata": {"class": "Class 10", "subject": "Math", "chapter": "Trigonometry", "topic": "Trigonometric Ratios"}
-        },
-        {
-            "id": "science12_physics_electricity_1",
-            "text": "Ohm's law states V = IR where V is voltage, I is current, R is resistance. Power is given by P = VI. Series and parallel circuits have different resistance combinations.",
-            "metadata": {"class": "Class 12", "subject": "Science", "chapter": "Physics", "topic": "Electricity"}
-        },
-        {
-            "id": "science12_chemistry_organic_1",
-            "text": "Organic chemistry studies carbon compounds. Hydrocarbons include alkanes (C-C single bonds), alkenes (C=C double bonds), and alkynes (C≡C triple bonds). Functional groups determine reactivity.",
-            "metadata": {"class": "Class 12", "subject": "Science", "chapter": "Chemistry", "topic": "Organic Chemistry"}
-        },
-        {
-            "id": "math12_vectors_1",
-            "text": "Vectors have magnitude and direction. Operations include addition (triangle/parallelogram law), scalar multiplication, dot product (scalar result), and cross product (vector result).",
-            "metadata": {"class": "Class 12", "subject": "Math", "chapter": "Vectors", "topic": "Vector Operations"}
-        },
-        {
-            "id": "math10_statistics_mean_1",
-            "text": "Measures of central tendency include mean (average), median (middle value), and mode (most frequent). Standard deviation measures spread of data.",
-            "metadata": {"class": "Class 10", "subject": "Math", "chapter": "Statistics", "topic": "Central Tendency"}
-        }
-    ]
-
-
-def upsert_dummy_data(index: Any) -> None:
-    """
-    Populate Pinecone index with dummy syllabus embeddings.
+    Process PDF and upload to Pinecone vector store.
     
     Args:
         index: Pinecone index object
+        pdf_path: Path to PDF file
+        class_level: Class level (e.g., "Class 10")
+        subject: Subject name
+        chapter: Chapter name
+        progress_callback: Optional callback for progress updates
+        
+    Returns:
+        Dictionary with upload statistics
     """
     try:
-        syllabus_data = get_dummy_syllabus_data()
-        vectors = []
+        if progress_callback:
+            progress_callback("Extracting text from PDF...")
         
-        logger.info("Generating embeddings for dummy data...")
-        for item in syllabus_data:
-            embedding = get_embedding(item["text"])
-            vectors.append({
-                "id": item["id"],
-                "values": embedding,
-                "metadata": {
-                    **item["metadata"],
-                    "text": item["text"]
-                }
-            })
+        # Process and embed PDF
+        api_key = os.getenv("OPENAI_API_KEY")
+        vectors = process_and_embed_pdf(
+            pdf_path=pdf_path,
+            api_key=api_key,
+            class_level=class_level,
+            subject=subject,
+            chapter=chapter
+        )
         
-        # Upsert in batches
-        logger.info(f"Upserting {len(vectors)} vectors to Pinecone...")
-        index.upsert(vectors=vectors)
-        logger.info("Dummy data upserted successfully")
+        if progress_callback:
+            progress_callback(f"Uploading {len(vectors)} chunks to vector store...")
+        
+        # Upsert to Pinecone in batches
+        batch_size = 100
+        for i in range(0, len(vectors), batch_size):
+            batch = vectors[i:i + batch_size]
+            index.upsert(vectors=batch)
+            
+            if progress_callback:
+                progress = (i + len(batch)) / len(vectors) * 100
+                progress_callback(f"Uploaded {i + len(batch)}/{len(vectors)} chunks ({progress:.1f}%)")
+        
+        # Get file metadata
+        filename = os.path.basename(pdf_path)
+        file_hash = vectors[0]["metadata"]["file_hash"] if vectors else None
+        
+        result = {
+            "filename": filename,
+            "file_hash": file_hash,
+            "chunks_uploaded": len(vectors),
+            "class": class_level,
+            "subject": subject,
+            "chapter": chapter,
+            "status": "success"
+        }
+        
+        logger.info(f"Successfully uploaded {filename}: {len(vectors)} chunks")
+        return result
+        
     except Exception as e:
-        logger.error(f"Error upserting dummy data: {e}")
-        raise
+        logger.error(f"Error uploading PDF: {e}")
+        return {
+            "filename": os.path.basename(pdf_path),
+            "status": "error",
+            "error": str(e)
+        }
 
 
 def query_syllabus_context(
     index: Any,
     query_text: str,
     filters: Optional[Dict[str, str]] = None,
-    top_k: int = 3
+    top_k: int = 5
 ) -> List[Dict[str, Any]]:
     """
     Query Pinecone for relevant syllabus context.
@@ -264,6 +223,85 @@ def query_syllabus_context(
         return []
 
 
+def get_uploaded_documents(index: Any) -> List[Dict[str, Any]]:
+    """
+    Get list of unique documents in vector store.
+    
+    Args:
+        index: Pinecone index object
+        
+    Returns:
+        List of document metadata
+    """
+    try:
+        stats = index.describe_index_stats()
+        
+        # Query for unique documents using metadata
+        # This is a simplified version - in production, maintain a separate metadata store
+        sample_results = index.query(
+            vector=[0.0] * 1536,
+            top_k=100,
+            include_metadata=True
+        )
+        
+        # Extract unique documents
+        docs_dict = {}
+        for match in sample_results.matches:
+            file_hash = match.metadata.get("file_hash")
+            if file_hash and file_hash not in docs_dict:
+                docs_dict[file_hash] = {
+                    "filename": match.metadata.get("filename", "Unknown"),
+                    "file_hash": file_hash,
+                    "class": match.metadata.get("class", "Unknown"),
+                    "subject": match.metadata.get("subject", "Unknown"),
+                    "chapter": match.metadata.get("chapter", "Unknown")
+                }
+        
+        return list(docs_dict.values())
+        
+    except Exception as e:
+        logger.error(f"Error getting uploaded documents: {e}")
+        return []
+
+
+def delete_document_from_vectorstore(
+    index: Any,
+    file_hash: str
+) -> bool:
+    """
+    Delete all vectors associated with a document.
+    
+    Args:
+        index: Pinecone index object
+        file_hash: Hash of file to delete
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Query all vectors with this file_hash
+        results = index.query(
+            vector=[0.0] * 1536,
+            top_k=10000,
+            include_metadata=True,
+            filter={"file_hash": file_hash}
+        )
+        
+        # Delete by IDs
+        if results.matches:
+            ids_to_delete = [match.id for match in results.matches]
+            index.delete(ids=ids_to_delete)
+            logger.info(f"Deleted {len(ids_to_delete)} vectors for file_hash: {file_hash}")
+            return True
+        
+        logger.warning(f"No vectors found for file_hash: {file_hash}")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error deleting document: {e}")
+        return False
+
+
 def get_curriculum_options() -> Dict[str, Dict[str, Dict[str, List[str]]]]:
     """
     Get hierarchical curriculum options for UI dropdowns.
@@ -298,3 +336,25 @@ def get_curriculum_options() -> Dict[str, Dict[str, Dict[str, List[str]]]]:
             }
         }
     }
+
+
+def get_vectorstore_stats(index: Any) -> Dict[str, Any]:
+    """
+    Get statistics about the vector store.
+    
+    Args:
+        index: Pinecone index object
+        
+    Returns:
+        Dictionary with statistics
+    """
+    try:
+        stats = index.describe_index_stats()
+        return {
+            "total_vectors": stats.total_vector_count,
+            "dimension": 1536,
+            "index_fullness": stats.index_fullness if hasattr(stats, 'index_fullness') else 0.0
+        }
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
+        return {"total_vectors": 0, "dimension": 1536, "index_fullness": 0.0}
