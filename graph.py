@@ -1,8 +1,9 @@
 # graph.py
 """
-LangGraph workflow definition for the question paper generation pipeline.
+LangGraph workflow definition with timing measurements.
 """
 import logging
+import time
 from typing import Literal
 from langgraph.graph import StateGraph, END
 from agents import (
@@ -12,13 +13,14 @@ from agents import (
     format_output_node
 )
 from utils import query_syllabus_context
+from timing_decorator import TimingStats, time_stage
 
 logger = logging.getLogger(__name__)
 
 
 def create_workflow_graph(pinecone_index):
     """
-    Create the LangGraph workflow for question generation.
+    Create the LangGraph workflow for question generation with timing.
     
     Args:
         pinecone_index: Pinecone index for syllabus context retrieval
@@ -35,29 +37,77 @@ def create_workflow_graph(pinecone_index):
     workflow = StateGraph(WorkflowState)
     
     def retrieve_context(state: WorkflowState) -> WorkflowState:
-        """Retrieve relevant syllabus context from Pinecone."""
-        try:
-            inputs = state["user_inputs"]
-            query_text = f"{inputs['topic']} {inputs['chapter']}"
-            
-            filters = {
-                "class": inputs["class"],
-                "subject": inputs["subject"]
-            }
-            
-            contexts = query_syllabus_context(
-                pinecone_index,
-                query_text,
-                filters=filters,
-                top_k=3
-            )
-            
-            state["context_snippets"] = [ctx["text"] for ctx in contexts]
-            logger.info(f"Retrieved {len(contexts)} context snippets")
-            
-        except Exception as e:
-            logger.warning(f"Error retrieving context: {e}")
-            state["context_snippets"] = []
+        """Retrieve relevant syllabus context from Pinecone with timing."""
+        timing_stats = state.get("timing_stats") or TimingStats()
+        
+        with time_stage(timing_stats, "Context Retrieval"):
+            try:
+                inputs = state["user_inputs"]
+                query_text = f"{inputs['topic']} {inputs['chapter']}"
+                
+                filters = {
+                    "class": inputs["class"],
+                    "subject": inputs["subject"]
+                }
+                
+                contexts = query_syllabus_context(
+                    pinecone_index,
+                    query_text,
+                    filters=filters,
+                    top_k=3
+                )
+                
+                state["context_snippets"] = [ctx["text"] for ctx in contexts]
+                logger.info(f"Retrieved {len(contexts)} context snippets")
+                
+            except Exception as e:
+                logger.warning(f"Error retrieving context: {e}")
+                state["context_snippets"] = []
+        
+        state["timing_stats"] = timing_stats
+        return state
+    
+    def timed_generator(state: WorkflowState) -> WorkflowState:
+        """Generator with timing."""
+        timing_stats = state.get("timing_stats") or TimingStats()
+        
+        with time_stage(timing_stats, "Question Generation"):
+            state = generator(state)
+        
+        state["timing_stats"] = timing_stats
+        return state
+    
+    def timed_validator(state: WorkflowState) -> WorkflowState:
+        """Validator with timing."""
+        timing_stats = state.get("timing_stats") or TimingStats()
+        
+        with time_stage(timing_stats, "Question Validation"):
+            state = validator(state)
+        
+        state["timing_stats"] = timing_stats
+        return state
+    
+    def timed_format_output(state: WorkflowState) -> WorkflowState:
+        """Format output with timing."""
+        timing_stats = state.get("timing_stats") or TimingStats()
+        
+        with time_stage(timing_stats, "Output Formatting"):
+            state = format_output_node(state)
+        
+        # Add timing summary to state
+        timing_summary = timing_stats.get_summary()
+        state["timing_summary"] = timing_summary
+        
+        # Calculate per-question metrics
+        num_questions = len(state.get("validated_questions", []))
+        if num_questions > 0:
+            avg_time = timing_summary["total_time"] / num_questions
+            timing_summary["avg_time_per_question"] = f"{avg_time:.2f}s"
+        
+        logger.info(f"⏱️  Total generation time: {timing_summary['total_formatted']}")
+        logger.info(f"⏱️  Questions generated: {num_questions}")
+        if num_questions > 0:
+            logger.info(f"⏱️  Average time per question: {timing_summary['avg_time_per_question']}")
         
         return state
     
@@ -80,11 +130,11 @@ def create_workflow_graph(pinecone_index):
         
         return "end"
     
-    # Add nodes
+    # Add nodes with timing
     workflow.add_node("retrieve_context", retrieve_context)
-    workflow.add_node("generator", generator)
-    workflow.add_node("validator", validator)
-    workflow.add_node("format_output", format_output_node)
+    workflow.add_node("generator", timed_generator)
+    workflow.add_node("validator", timed_validator)
+    workflow.add_node("format_output", timed_format_output)
     
     # Define edges
     workflow.set_entry_point("retrieve_context")
@@ -107,64 +157,3 @@ def create_workflow_graph(pinecone_index):
     app = workflow.compile()
     
     return app
-
-
-def test_workflow():
-    """Test the workflow with sample inputs."""
-    from utils import initialize_pinecone, setup_syllabus_index, upsert_dummy_data
-    
-    print("Initializing Pinecone...")
-    pc = initialize_pinecone()
-    index = setup_syllabus_index(pc)
-    
-    print("Setting up dummy data...")
-    upsert_dummy_data(index)
-    
-    print("Creating workflow...")
-    app = create_workflow_graph(index)
-    
-    print("Testing workflow...")
-    initial_state: WorkflowState = {
-        "user_inputs": {
-            "class": "Class 10",
-            "subject": "Math",
-            "chapter": "Algebra",
-            "topic": "Quadratic Equations",
-            "num_questions": 3,
-            "difficulty": 3,
-            "question_type": "Objective",
-            "choice_type": "Single Choice"
-        },
-        "raw_generated_questions": [],
-        "validated_questions": [],
-        "output": "",
-        "output_latex": "",
-        "retry_count": 0,
-        "context_snippets": []
-    }
-    
-    print("Running workflow...")
-    result = app.invoke(initial_state)
-    
-    print("\n" + "="*80)
-    print("WORKFLOW RESULT")
-    print("="*80)
-    print(f"\nGenerated Questions: {len(result['raw_generated_questions'])}")
-    print(f"Validated Questions: {len(result['validated_questions'])}")
-    print(f"Retry Count: {result['retry_count']}")
-    
-    print("\n" + "="*80)
-    print("OUTPUT (Plain Text)")
-    print("="*80)
-    print(result['output'])
-    
-    print("\n" + "="*80)
-    print("OUTPUT (LaTeX)")
-    print("="*80)
-    print(result['output_latex'][:500] + "...")
-    
-    return result
-
-
-if __name__ == "__main__":
-    test_workflow()

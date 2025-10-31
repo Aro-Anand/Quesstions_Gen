@@ -1,6 +1,6 @@
 # app.py
 """
-Enhanced Streamlit application with PDF upload capabilities.
+Enhanced Streamlit application with timing and HTML export.
 """
 import streamlit as st
 import logging
@@ -19,12 +19,19 @@ from utils import (
 )
 from graph import create_workflow_graph
 from agents import WorkflowState
+from timing_decorator import TimingStats
 
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Page configuration
@@ -62,20 +69,19 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #145a8c;
     }
-    .upload-section {
-        background-color: #f0f8ff;
+    .timing-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
         padding: 1.5rem;
         border-radius: 10px;
-        border: 2px dashed #1f77b4;
         margin: 1rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .doc-card {
-        background-color: #ffffff;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #1f77b4;
-        margin: 0.5rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    .stage-timing {
+        background-color: rgba(255,255,255,0.2);
+        padding: 0.5rem;
+        border-radius: 5px;
+        margin: 0.3rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -174,7 +180,7 @@ def render_document_management_tab(index):
     )
     
     if uploaded_files:
-        st.info(f"📎 {len(uploaded_files)} file(s) selected")
+        st.info(f"📋 {len(uploaded_files)} file(s) selected")
         
         if st.button("🚀 Upload and Process", type="primary"):
             progress_bar = st.progress(0)
@@ -253,7 +259,8 @@ def render_document_management_tab(index):
             
             with col1:
                 st.markdown(f"""
-                <div class="doc-card">
+                <div style="background-color: #ffffff; padding: 1rem; border-radius: 8px; 
+                     border-left: 4px solid #1f77b4; margin: 0.5rem 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <strong>📄 {doc['filename']}</strong><br>
                     <small>Class: {doc['class']} | Subject: {doc['subject']} | Chapter: {doc['chapter']}</small><br>
                     <small>Hash: {doc['file_hash'][:16]}...</small>
@@ -372,6 +379,65 @@ def render_sidebar() -> Dict[str, Any]:
     }
 
 
+def display_timing_metrics(timing_summary: Dict[str, Any]):
+    """Display timing metrics in an attractive format."""
+    st.markdown("### ⏱️ Generation Performance Metrics")
+    
+    # Main metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            label="⏱️ Total Time",
+            value=timing_summary.get("total_formatted", "N/A"),
+            help="Total time for complete generation process"
+        )
+    
+    with col2:
+        st.metric(
+            label="📝 Per Question",
+            value=timing_summary.get("avg_time_per_question", "N/A"),
+            help="Average time per question"
+        )
+    
+    with col3:
+        total_time = timing_summary.get("total_time", 0)
+        questions_per_min = (60 / (total_time / len(st.session_state.get("last_result", {}).get("validated_questions", [1])))) if total_time > 0 else 0
+        st.metric(
+            label="🚀 Questions/Min",
+            value=f"{questions_per_min:.1f}",
+            help="Generation rate"
+        )
+    
+    with col4:
+        # Calculate efficiency score (higher is better)
+        efficiency = min(100, int((1 / total_time * 100) if total_time > 0 else 100))
+        st.metric(
+            label="⚡ Efficiency",
+            value=f"{efficiency}%",
+            help="Overall generation efficiency"
+        )
+    
+    # Stage-wise breakdown
+    if "stages_formatted" in timing_summary:
+        st.markdown("#### 📊 Stage-wise Breakdown")
+        
+        stages = timing_summary["stages_formatted"]
+        stage_times = timing_summary.get("stages", {})
+        total = timing_summary.get("total_time", 1)
+        
+        for stage, formatted_time in stages.items():
+            percentage = (stage_times.get(stage, 0) / total * 100) if total > 0 else 0
+            col1, col2, col3 = st.columns([3, 1, 1])
+            
+            with col1:
+                st.progress(percentage / 100)
+            with col2:
+                st.markdown(f"**{stage}**")
+            with col3:
+                st.markdown(f"`{formatted_time}` ({percentage:.1f}%)")
+
+
 def display_validation_metrics(result: Dict[str, Any]):
     """Display validation metrics in a nice format."""
     raw_count = len(result.get("raw_generated_questions", []))
@@ -448,6 +514,12 @@ def display_question_details(result: Dict[str, Any]):
 def main():
     """Main application entry point."""
     
+    # Initialize session state for storing results
+    if "last_result" not in st.session_state:
+        st.session_state["last_result"] = None
+    if "html_content" not in st.session_state:
+        st.session_state["html_content"] = None
+    
     # Header
     st.markdown('<div class="main-header">📝 AI Question Paper Generator</div>', unsafe_allow_html=True)
     st.markdown(
@@ -491,12 +563,15 @@ def main():
         st.markdown("---")
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            generate_button = st.button("🚀 Generate Question Paper", use_container_width=True)
+            generate_button = st.button("🚀 Generate Question Paper", use_container_width=True, key="generate_btn")
         
         # Generate questions when button is clicked
         if generate_button:
+            # Clear previous HTML content
+            st.session_state["html_content"] = None
+            
             try:
-                # Create initial state
+                # Create initial state with timing
                 initial_state: WorkflowState = {
                     "user_inputs": user_inputs,
                     "raw_generated_questions": [],
@@ -504,7 +579,9 @@ def main():
                     "output": "",
                     "output_latex": "",
                     "retry_count": 0,
-                    "context_snippets": []
+                    "context_snippets": [],
+                    "timing_stats": TimingStats(),
+                    "timing_summary": {}
                 }
                 
                 # Run workflow with progress indicator
@@ -514,80 +591,13 @@ def main():
                 # Check if generation was successful
                 if not result.get("validated_questions"):
                     st.error("❌ Failed to generate valid questions. Please try again with different parameters.")
-                    return
-                
-                # Success message
-                st.success(f"✅ Successfully generated {len(result['validated_questions'])} questions!")
-                
-                # Display metrics
-                st.markdown("---")
-                display_validation_metrics(result)
-                
-                # Main output tabs
-                st.markdown("---")
-                output_tab1, output_tab2, output_tab3, output_tab4 = st.tabs([
-                    "📄 Plain Text Output",
-                    "🔤 LaTeX Output",
-                    "📊 Validation Details",
-                    "💾 Download Options"
-                ])
-                
-                with output_tab1:
-                    st.markdown("### Question Paper (Plain Text)")
-                    output_text = result.get("output", "No output generated")
-                    st.text_area(
-                        "Generated Questions",
-                        value=output_text,
-                        height=600,
-                        label_visibility="collapsed"
-                    )
-                
-                with output_tab2:
-                    st.markdown("### Question Paper (LaTeX)")
-                    st.markdown("""
-                    Copy the LaTeX code below and compile it with your favorite LaTeX editor 
-                    (e.g., Overleaf, TeXShop, or pdflatex).
-                    """)
-                    output_latex = result.get("output_latex", "No LaTeX output generated")
-                    st.code(output_latex, language="latex", line_numbers=True)
-                
-                with output_tab3:
-                    display_question_details(result)
-                
-                with output_tab4:
-                    st.markdown("### 💾 Download Options")
+                else:
+                    # Store result in session state
+                    st.session_state["last_result"] = result
                     
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        # Download plain text
-                        st.download_button(
-                            label="📥 Download Plain Text (.txt)",
-                            data=result.get("output", ""),
-                            file_name="question_paper.txt",
-                            mime="text/plain",
-                            use_container_width=True
-                        )
-                    
-                    with col2:
-                        # Download LaTeX
-                        st.download_button(
-                            label="📥 Download LaTeX (.tex)",
-                            data=result.get("output_latex", ""),
-                            file_name="question_paper.tex",
-                            mime="text/x-tex",
-                            use_container_width=True
-                        )
-                    
-                    st.info("""
-                    **💡 Tip:** To compile the LaTeX file:
-                    1. Download the .tex file
-                    2. Upload to [Overleaf](https://www.overleaf.com) or use a local LaTeX compiler
-                    3. Compile to generate a PDF
-                    """)
-                
-                # Store result in session state for reference
-                st.session_state["last_result"] = result
+                    # Success message
+                    st.success(f"✅ Successfully generated {len(result['validated_questions'])} questions!")
+                    st.rerun()
                 
             except Exception as e:
                 st.error(f"❌ An error occurred during generation: {str(e)}")
@@ -595,6 +605,152 @@ def main():
                 
                 with st.expander("🔍 Error Details"):
                     st.code(str(e))
+        
+        # Display results if they exist in session state
+        if st.session_state.get("last_result"):
+            result = st.session_state["last_result"]
+            
+            # Display timing metrics
+            st.markdown("---")
+            if "timing_summary" in result:
+                display_timing_metrics(result["timing_summary"])
+            
+            # Display validation metrics
+            st.markdown("---")
+            display_validation_metrics(result)
+            
+            # Main output tabs
+            st.markdown("---")
+            output_tab1, output_tab2, output_tab3, output_tab4, output_tab5 = st.tabs([
+                "📄 Plain Text Output",
+                "📤 LaTeX Output",
+                "🌐 HTML Preview",
+                "📊 Validation Details",
+                "💾 Download Options"
+            ])
+            
+            with output_tab1:
+                st.markdown("### Question Paper (Plain Text)")
+                output_text = result.get("output", "No output generated")
+                st.text_area(
+                    "Generated Questions",
+                    value=output_text,
+                    height=600,
+                    label_visibility="collapsed"
+                )
+            
+            with output_tab2:
+                st.markdown("### Question Paper (LaTeX)")
+                st.markdown("""
+                Copy the LaTeX code below and compile it with your favorite LaTeX editor 
+                (e.g., Overleaf, TeXShop, or pdflatex).
+                """)
+                output_latex = result.get("output_latex", "No LaTeX output generated")
+                st.code(output_latex, language="latex", line_numbers=True)
+            
+            with output_tab3:
+                st.markdown("### Question Paper (HTML from LaTeX)")
+                
+                st.info("🔄 Convert your LaTeX document to HTML while preserving all formatting")
+                
+                # Convert button with unique key
+                if st.button("🌐 Convert LaTeX to HTML", key="convert_latex_html", use_container_width=True):
+                    try:
+                        logger.info("Starting LaTeX to HTML conversion process")
+                        from html_exporter import LaTeXToHTMLConverter
+                        
+                        # Initialize converter
+                        converter = LaTeXToHTMLConverter()
+                        logger.info("LaTeX converter initialized")
+                        
+                        # Get LaTeX content
+                        latex_content = result.get("output_latex", "")
+                        if not latex_content:
+                            logger.error("No LaTeX content available")
+                            st.error("❌ No LaTeX content available")
+                        else:
+                            logger.info(f"Got LaTeX content (length: {len(latex_content)})")
+                            
+                            with st.spinner("Converting LaTeX to HTML with Pandoc..."):
+                                logger.info("Starting Pandoc conversion")
+                                # Convert LaTeX to HTML
+                                success, html_content = converter.latex_to_html(
+                                    latex_content=latex_content,
+                                    include_mathjax=True
+                                )
+                                
+                                if success and html_content:
+                                    logger.info("HTML conversion successful")
+                                    # Store in session state
+                                    st.session_state["html_content"] = html_content
+                                    st.success("✅ LaTeX converted to HTML successfully!")
+                                    st.rerun()
+                                else:
+                                    logger.error("HTML conversion failed")
+                                    st.error("❌ Failed to convert LaTeX to HTML")
+                                    st.info("💡 Make sure Pandoc is installed: https://pandoc.org/installing.html")
+                    
+                    except Exception as e:
+                        logger.error(f"Conversion error: {str(e)}", exc_info=True)
+                        st.error(f"❌ Error during conversion: {str(e)}")
+                        
+                        with st.expander("🔍 Error Details"):
+                            st.code(str(e))
+                
+                # Display HTML if it exists
+                if st.session_state.get("html_content"):
+                    st.markdown("---")
+                    st.markdown("### 👀 HTML Preview")
+                    st.components.v1.html(st.session_state["html_content"], height=600, scrolling=True)
+            
+            with output_tab4:
+                display_question_details(result)
+            
+            with output_tab5:
+                st.markdown("### 💾 Download Options")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Download plain text
+                    st.download_button(
+                        label="📥 Download Plain Text (.txt)",
+                        data=result.get("output", ""),
+                        file_name="question_paper.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+                
+                with col2:
+                    # Download LaTeX
+                    st.download_button(
+                        label="📥 Download LaTeX (.tex)",
+                        data=result.get("output_latex", ""),
+                        file_name="question_paper.tex",
+                        mime="text/x-tex",
+                        use_container_width=True
+                    )
+                
+                with col3:
+                    # Download HTML if generated
+                    if st.session_state.get("html_content"):
+                        st.download_button(
+                            label="📥 Download HTML (.html)",
+                            data=st.session_state["html_content"],
+                            file_name="question_paper.html",
+                            mime="text/html",
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("💡 Convert to HTML first", icon="ℹ️")
+                
+                st.markdown("---")
+                st.info("""
+                **💡 Tips:**
+                - **Plain Text**: Ready to copy-paste into any document
+                - **LaTeX**: Upload to [Overleaf](https://www.overleaf.com) or use local compiler
+                - **HTML**: Open in browser for a beautiful, shareable blog-style page
+                """)
     
     with tab2:
         render_document_management_tab(index)

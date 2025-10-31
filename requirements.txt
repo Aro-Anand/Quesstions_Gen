@@ -20,3 +20,5 @@ tiktoken
 # Utilities
 pandas
 numpy
+
+colorlog

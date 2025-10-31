@@ -305,38 +305,174 @@ def delete_document_from_vectorstore(
 def get_curriculum_options() -> Dict[str, Dict[str, Dict[str, List[str]]]]:
     """
     Get hierarchical curriculum options for UI dropdowns.
+    Includes grades 6-12 with NEET/JEE focused subjects.
     
     Returns:
         Nested dictionary of class -> subject -> chapter -> topics
     """
     return {
-        "Class 10": {
-            "Math": {
-                "Algebra": ["Quadratic Equations", "Polynomials", "Linear Equations"],
-                "Geometry": ["Triangles", "Circles", "Coordinate Geometry"],
-                "Trigonometry": ["Trigonometric Ratios", "Heights and Distances"],
-                "Statistics": ["Central Tendency", "Probability"]
+        "Class 6": {
+            "Mathematics": {
+                "Number System": ["Whole Numbers", "Playing with Numbers", "Integers"],
+                "Algebra": ["Introduction to Algebra", "Simple Equations"],
+                "Geometry": ["Basic Shapes", "Symmetry", "Practical Geometry"],
+                "Mensuration": ["Perimeter and Area", "Data Handling"]
             },
             "Science": {
-                "Physics": ["Motion and Force", "Light", "Sound"],
-                "Chemistry": ["Acids and Bases", "Metals and Non-metals", "Chemical Reactions"],
-                "Biology": ["Cell Structure", "Heredity", "Life Processes"]
+                "Physics": ["Motion and Measurement", "Light, Shadows and Reflections", "Electricity and Circuits"],
+                "Chemistry": ["Materials", "Separation of Substances", "Changes Around Us"],
+                "Biology": ["Food and Nutrition", "Body Movements", "Living Organisms"]
             }
         },
-        "Class 12": {
-            "Math": {
-                "Calculus": ["Derivatives", "Integration", "Differential Equations"],
-                "Vectors": ["Vector Operations", "3D Geometry"],
-                "Probability": ["Conditional Probability", "Distributions"]
+        "Class 7": {
+            "Mathematics": {
+                "Number System": ["Integers", "Fractions and Decimals", "Rational Numbers"],
+                "Algebra": ["Simple Equations", "Algebraic Expressions"],
+                "Geometry": ["Lines and Angles", "Triangles", "Congruence"],
+                "Mensuration": ["Perimeter and Area", "Comparing Quantities"]
             },
             "Science": {
-                "Physics": ["Electricity", "Magnetism", "Optics", "Modern Physics"],
-                "Chemistry": ["Organic Chemistry", "Chemical Kinetics", "Electrochemistry"],
-                "Biology": ["Genetics", "Evolution", "Ecology"]
+                "Physics": ["Heat", "Motion and Time", "Electric Current"],
+                "Chemistry": ["Acids, Bases and Salts", "Physical and Chemical Changes"],
+                "Biology": ["Nutrition in Plants and Animals", "Respiration", "Transportation"]
+            }
+        },
+        "Class 8": {
+            "Mathematics": {
+                "Number System": ["Rational Numbers", "Powers and Exponents", "Squares and Square Roots"],
+                "Algebra": ["Linear Equations", "Algebraic Expressions", "Factorisation"],
+                "Geometry": ["Quadrilaterals", "Circles", "Mensuration"],
+                "Data Handling": ["Data Handling", "Introduction to Graphs"]
+            },
+            "Science": {
+                "Physics": ["Force and Pressure", "Friction", "Sound", "Light"],
+                "Chemistry": ["Materials", "Combustion", "Chemical Effects of Current"],
+                "Biology": ["Cell Structure", "Reproduction", "Ecosystems"]
+            }
+        },
+        "Class 9": {
+            "Mathematics": {
+                "Number System": ["Real Numbers", "Polynomials"],
+                "Algebra": ["Linear Equations in Two Variables", "Quadratic Equations"],
+                "Geometry": ["Lines and Angles", "Triangles", "Circles", "Constructions"],
+                "Coordinate Geometry": ["Coordinate Geometry Basics"],
+                "Mensuration": ["Areas", "Surface Areas and Volumes"],
+                "Statistics": ["Statistics", "Probability"]
+            },
+            "Physics": {
+                "Mechanics": ["Motion", "Force and Laws of Motion", "Gravitation"],
+                "Energy": ["Work and Energy", "Sound"],
+                "Matter": ["Matter in Our Surroundings", "Atoms and Molecules"]
+            },
+            "Chemistry": {
+                "Matter": ["Matter", "Atoms and Molecules", "Structure of Atom"],
+                "Classification": ["Classification of Elements", "Periodic Table"],
+                "Reactions": ["Chemical Reactions", "Acids, Bases and Salts"]
+            },
+            "Biology": {
+                "Cell Biology": ["The Fundamental Unit of Life", "Tissues"],
+                "Diversity": ["Diversity in Living Organisms"],
+                "Health": ["Health and Diseases", "Natural Resources"]
+            }
+        },
+        "Class 10": {
+            "Mathematics": {
+                "Number System": ["Real Numbers", "Polynomials"],
+                "Algebra": ["Linear Equations", "Quadratic Equations", "Arithmetic Progressions"],
+                "Geometry": ["Triangles", "Circles", "Constructions"],
+                "Coordinate Geometry": ["Coordinate Geometry", "Lines"],
+                "Trigonometry": ["Introduction to Trigonometry", "Heights and Distances"],
+                "Mensuration": ["Areas Related to Circles", "Surface Areas and Volumes"],
+                "Statistics": ["Statistics", "Probability"]
+            },
+            "Physics": {
+                "Mechanics": ["Motion", "Force and Laws of Motion"],
+                "Energy": ["Work and Energy", "Sound"],
+                "Electricity": ["Electricity", "Magnetic Effects of Current"],
+                "Optics": ["Light - Reflection and Refraction", "Human Eye"]
+            },
+            "Chemistry": {
+                "Reactions": ["Chemical Reactions and Equations", "Acids, Bases and Salts"],
+                "Materials": ["Metals and Non-metals", "Carbon Compounds"],
+                "Periodic Classification": ["Periodic Classification of Elements"]
+            },
+            "Biology": {
+                "Life Processes": ["Life Processes", "Control and Coordination"],
+                "Reproduction": ["How Do Organisms Reproduce", "Heredity and Evolution"],
+                "Environment": ["Our Environment", "Natural Resources"]
+            }
+        },
+        "Class 11 - JEE": {
+            "Mathematics": {
+                "Algebra": ["Sets and Relations", "Complex Numbers", "Quadratic Equations", "Sequences and Series", "Permutations and Combinations", "Binomial Theorem"],
+                "Trigonometry": ["Trigonometric Functions", "Trigonometric Equations", "Inverse Trigonometric Functions"],
+                "Coordinate Geometry": ["Straight Lines", "Conic Sections", "3D Geometry Introduction"],
+                "Calculus": ["Limits and Derivatives", "Mathematical Reasoning"],
+                "Statistics": ["Statistics", "Probability"]
+            },
+            "Physics": {
+                "Mechanics": ["Units and Measurements", "Motion in Straight Line", "Motion in Plane", "Laws of Motion", "Work Energy Power", "Rotational Motion", "Gravitation"],
+                "Properties of Matter": ["Mechanical Properties of Solids", "Fluids", "Thermal Properties", "Thermodynamics"],
+                "Waves": ["Oscillations", "Waves"]
+            },
+            "Chemistry": {
+                "Physical Chemistry": ["Mole Concept", "Atomic Structure", "Chemical Bonding", "States of Matter", "Thermodynamics", "Equilibrium", "Redox Reactions"],
+                "Organic Chemistry": ["Basic Principles", "Hydrocarbons", "Organic Compounds"],
+                "Inorganic Chemistry": ["Periodic Table", "Hydrogen", "S-Block Elements", "P-Block Elements", "Environmental Chemistry"]
+            }
+        },
+        "Class 11 - NEET": {
+            "Physics": {
+                "Mechanics": ["Units and Measurements", "Motion", "Laws of Motion", "Work Energy Power", "Gravitation", "Rotational Motion"],
+                "Properties of Matter": ["Properties of Solids and Liquids", "Thermodynamics", "Kinetic Theory"],
+                "Waves": ["Oscillations and Waves"]
+            },
+            "Chemistry": {
+                "Physical Chemistry": ["Mole Concept", "Atomic Structure", "States of Matter", "Thermodynamics", "Equilibrium", "Redox Reactions"],
+                "Organic Chemistry": ["Basic Principles of Organic Chemistry", "Hydrocarbons"],
+                "Inorganic Chemistry": ["Periodic Table", "Chemical Bonding", "Hydrogen", "S-Block", "P-Block Elements"]
+            },
+            "Biology": {
+                "Botany": ["Diversity in Living World", "Plant Kingdom", "Morphology of Flowering Plants", "Anatomy of Flowering Plants", "Cell - Structure and Functions", "Biomolecules", "Cell Cycle"],
+                "Zoology": ["Animal Kingdom", "Structural Organisation in Animals", "Biomolecules", "Digestion and Absorption", "Breathing and Respiration", "Body Fluids and Circulation", "Excretory Products", "Locomotion and Movement", "Neural Control", "Chemical Coordination"]
+            }
+        },
+        "Class 12 - JEE": {
+            "Mathematics": {
+                "Algebra": ["Relations and Functions", "Matrices and Determinants", "Continuity and Differentiability"],
+                "Calculus": ["Applications of Derivatives", "Integrals", "Applications of Integrals", "Differential Equations"],
+                "Vectors and 3D": ["Vectors", "Three Dimensional Geometry"],
+                "Probability": ["Probability", "Conditional Probability"],
+                "Linear Programming": ["Linear Programming"]
+            },
+            "Physics": {
+                "Electromagnetism": ["Electrostatics", "Current Electricity", "Magnetic Effects of Current", "Magnetism and Matter", "Electromagnetic Induction", "Alternating Current", "Electromagnetic Waves"],
+                "Optics": ["Ray Optics", "Wave Optics"],
+                "Modern Physics": ["Dual Nature of Matter", "Atoms", "Nuclei", "Semiconductor Electronics", "Communication Systems"]
+            },
+            "Chemistry": {
+                "Physical Chemistry": ["Solutions", "Electrochemistry", "Chemical Kinetics", "Surface Chemistry"],
+                "Inorganic Chemistry": ["p-Block Elements", "d and f Block Elements", "Coordination Compounds"],
+                "Organic Chemistry": ["Haloalkanes and Haloarenes", "Alcohols Phenols Ethers", "Aldehydes Ketones", "Carboxylic Acids", "Amines", "Biomolecules", "Polymers", "Chemistry in Everyday Life"]
+            }
+        },
+        "Class 12 - NEET": {
+            "Physics": {
+                "Electromagnetism": ["Electrostatics", "Current Electricity", "Magnetic Effects of Current", "Electromagnetic Induction", "Alternating Current"],
+                "Optics": ["Ray Optics and Optical Instruments", "Wave Optics"],
+                "Modern Physics": ["Dual Nature of Radiation", "Atoms and Nuclei", "Electronic Devices"]
+            },
+            "Chemistry": {
+                "Physical Chemistry": ["Solid State", "Solutions", "Electrochemistry", "Chemical Kinetics", "Surface Chemistry"],
+                "Inorganic Chemistry": ["General Principles of Metallurgy", "p-Block Elements", "d and f Block Elements", "Coordination Compounds"],
+                "Organic Chemistry": ["Haloalkanes and Haloarenes", "Alcohols Phenols Ethers", "Aldehydes Ketones Carboxylic Acids", "Organic Compounds containing Nitrogen", "Biomolecules", "Polymers", "Chemistry in Everyday Life"]
+            },
+            "Biology": {
+                "Botany": ["Reproduction in Organisms", "Sexual Reproduction in Flowering Plants", "Human Reproduction", "Reproductive Health", "Principles of Inheritance", "Molecular Basis of Inheritance", "Evolution", "Human Health and Disease", "Microbes in Human Welfare", "Biotechnology", "Organisms and Environment", "Biodiversity and Conservation", "Environmental Issues"],
+                "Zoology": ["Reproduction", "Genetics and Evolution", "Human Health and Disease", "Biotechnology and Applications", "Ecology and Environment"]
             }
         }
     }
-
 
 def get_vectorstore_stats(index: Any) -> Dict[str, Any]:
     """
